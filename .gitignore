@@ -1,3 +1,15 @@
+# --- TiendaIA: nunca subir ---
+# llaves y contraseñas reales
+.env
+
+# entorno virtual (cada quien crea el suyo)
+.venv/
+# archivos compilados de Python
+__pycache__/
+*.pyc
+# configuración local de Vercel
+.vercel/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
