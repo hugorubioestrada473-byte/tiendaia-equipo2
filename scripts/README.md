@@ -1,1 +1,1 @@
-"#Scripts de pruebas y mediciones" 
+"# Script de pruebas y mediciones" 
