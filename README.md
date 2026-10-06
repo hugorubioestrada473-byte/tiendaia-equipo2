@@ -1,3 +1,3 @@
 # tiendaia-equipo2
 
-B equipo B: primerog
+Equipo: integrantes A, B y C
