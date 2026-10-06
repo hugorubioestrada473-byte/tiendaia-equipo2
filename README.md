@@ -1,3 +1,3 @@
 # tiendaia-equipo2
 
-B: Equipo: B primero 
+Equipo: integrantes A, B y C
