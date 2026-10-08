@@ -1,0 +1,4 @@
+# Servicio integrador (Laboratorio 1). Instalar con: pip install -r requirements.txt
+fastapi>=0.115 # framework web: endpoints, validación con Pydantic y /docs
+uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la app; [standard] trae --env-file
+requests>=2.31 # cliente HTTP para Open-Meteo, Countries y Supabase
