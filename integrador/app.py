@@ -23,6 +23,9 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 app = FastAPI(title="TiendaIA - Servicio integrador")
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 # Timeout (conexión, lectura) en segundos: 3 s para conectar y 10 s para recibir
 # la respuesta. Nunca se espera para siempre a un servicio externo.
