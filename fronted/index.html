@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<!--
+Cliente web de TiendaIA (Laboratorio 2; se reutiliza en los Labs. 3 a 7).
+Este archivo solo define la ESTRUCTURA de la página (HTML).
+- La apariencia está en css/estilos.css.
+- El comportamiento (llamar al API Gateway, llenar tablas, dibujar la gráfica)
+está en js/api.js y js/app.js.
+No necesita servidor de aplicación: son archivos estáticos que el navegador
+descarga y ejecuta. El navegador habla con el backend solo a través del gateway.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<!-- viewport: que la página se adapte al ancho de un celular -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TiendaIA - Panel</title>
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<!-- ======================= Encabezado y menú ======================= -->
+<header class="encabezado">
+<h1>TiendaIA</h1>
+<!-- Indicador de conexión con el gateway: lo actualiza app.js -->
+<span id="estado-conexion" class="estado desconocido">sin verificar</span>
+<!-- Cada botón muestra la sección cuyo id está en data-seccion -->
+<nav class="menu">
+<button data-seccion="panel" class="activo">Panel</button>
+<button data-seccion="clientes">Clientes</button>
+<button data-seccion="productos">Productos</button>
+<button data-seccion="ventas">Ventas</button>
+<button data-seccion="ia">Predicción IA</button>
+<button data-seccion="notificaciones">Notificaciones</button>
+<button data-seccion="config">Configuración</button>
+</nav>
+</header>
+<!-- Zona de mensajes (éxito o error) que muestra app.js -->
+<div id="mensaje" class="mensaje oculto" role="status"></div>
+<main>
+<!-- ======================= Panel (dashboard) ======================= -->
+<section id="panel" class="seccion visible">
+<h2>Panel de la tienda</h2>
+<!-- Tarjetas con indicadores (KPI); app.js escribe los números -->
+<div class="tarjetas">
+<div class="tarjeta">
+<span>Clientes</span><strong id="kpi-clientes">-</strong></div>
+<div class="tarjeta">
+<span>Productos</span><strong id="kpi-productos">-</strong></div>
+<div class="tarjeta">
+<span>Ventas</span><strong id="kpi-ventas">-</strong></div>
+<div class="tarjeta">
+<span>Ingresos</span><strong id="kpi-ingresos">-</strong></div>
+</div>
+<div class="rejilla">
+<div class="caja">
+<h3>Ingresos por mes (todos los años)</h3>
+<!-- canvas: área de dibujo; la gráfica se dibuja con JavaScript -->
+<canvas id="grafica-meses" width="560" height="260"></canvas>
+</div>
+<div class="caja">
+<h3>Productos más vendidos</h3>
+<table>
+<thead><tr><th>Producto</th><th>Unidades</th><th>Ingresos</th></tr></thead>
+<tbody id="tabla-top"></tbody>
+</table>
+<h3>Estado de los servicios</h3>
+<ul id="lista-servicios" class="servicios"></ul>
+</div>
+</div>
+<button id="btn-actualizar-panel">Actualizar panel</button>
+</section>
+<!-- ======================= Clientes ======================= -->
+<section id="clientes" class="seccion">
+<h2>Clientes</h2>
+<!-- Formulario: "required" y type="email" hacen una primera validación en el
+navegador; el backend vuelve a validar (422) porque no se confía
+en el cliente -->
+<form id="form-cliente" class="formulario">
+<input type="hidden" id="cliente-id">
+<label>Nombre <input id="cliente-nombre" required maxlength="100"></label>
+<label>Correo
+<input id="cliente-correo" type="email" required maxlength="120"></label>
+<button type="submit">Guardar</button>
+<button type="reset" class="secundario">Limpiar</button>
+</form>
+<table>
+<thead><tr><th>Id</th><th>Nombre</th><th>Correo</th><th>Acciones</th></tr></thead>
+<tbody id="tabla-clientes"></tbody>
+</table>
+</section>
+<!-- ======================= Productos ======================= -->
+<section id="productos" class="seccion">
+<h2>Productos</h2>
+<form id="form-producto" class="formulario">
+<input type="hidden" id="producto-id">
+<label>Nombre <input id="producto-nombre" required maxlength="100"></label>
+<label>Precio <input id="producto-precio" type="number" min="0.01" step="0.01"
+
+required></label>
+
+<label>Categoría <input id="producto-categoria" value="general"></label>
+<button type="submit">Guardar</button>
+<button type="reset" class="secundario">Limpiar</button>
+</form>
+<!-- Filtros: funcionan cuando el equipo implementa la extensión de Productos -->
+<form id="form-filtros" class="formulario filtros">
+<label>Categoría <input id="filtro-categoria"></label>
+<label>Precio máximo <input id="filtro-precio" type="number" min="0" step="0.01">
+</label>
+<button type="submit" class="secundario">Filtrar</button>
+</form>
+<table>
+<thead><tr><th>Id</th><th>Nombre</th><th>Precio</th><th>Categoría</th>
+
+<th>Imagen</th><th>Acciones</th></tr></thead>
+
+<tbody id="tabla-productos"></tbody>
+</table>
+<!-- Imagen del producto: se usa a partir del Laboratorio 4 (Imagen-Service) -->
+<form id="form-imagen" class="formulario">
+<h3>Imagen de un producto (Laboratorio 4)</h3>
+<label>Producto <select id="imagen-producto" required></select></label>
+<label>Archivo <input id="imagen-archivo" type="file"
+
+accept="image/png,image/jpeg,image/webp" required></label>
+
+<button type="submit">Subir imagen</button>
+</form>
+</section>
+<!-- ======================= Ventas ======================= -->
+<section id="ventas" class="seccion">
+<h2>Ventas</h2>
+<form id="form-venta" class="formulario">
+<!-- Las listas se llenan con los clientes y productos que existen -->
+ <label>Cliente <select id="venta-cliente" required></select></label>
+<label>Producto <select id="venta-producto" required></select></label>
+<label>Cantidad <input id="venta-cantidad" type="number" min="1" max="1000"
+
+value="1" required></label>
+<label>Fecha <input id="venta-fecha" type="date"></label>
+<button type="submit">Registrar venta</button>
+</form>
+<table>
+<thead><tr><th>Id</th><th>Fecha</th><th>Cliente</th><th>Producto</th>
+<th>Cantidad</th><th>Total</th><th>Acciones</th></tr></thead>
+
+<tbody id="tabla-ventas"></tbody>
+</table>
+</section>
+<!-- ======================= Predicción con IA ======================= -->
+<section id="ia" class="seccion">
+<h2>Predicción de demanda</h2>
+<div class="rejilla">
+<div class="caja">
+<h3>1. Entrenar el modelo</h3>
+<p>Usa todas las ventas registradas (mínimo 30).</p>
+<button id="btn-entrenar">Entrenar</button>
+<p id="resultado-entrenamiento" class="resultado"></p>
+</div>
+<div class="caja">
+<h3>2. Predecir</h3>
+<form id="form-prediccion" class="formulario vertical">
+<label>Producto <select id="pred-producto" required></select></label>
+<label>Mes <input id="pred-mes" type="number" min="1" max="12" value="12"
+
+required></label>
+
+<label>Precio <input id="pred-precio" type="number" min="0.01" step="0.01"
+
+required></label>
+<button type="submit">Predecir ahora</button>
+<!-- A partir del Lab. 3: la misma predicción por la cola de mensajes -->
+<button type="button" id="btn-pred-async" class="secundario">
+Predecir en cola (Lab. 3)</button>
+</form>
+<p id="resultado-prediccion" class="resultado"></p>
+</div>
+</div>
+</section>
+<!-- ======================= Notificaciones (Lab. 3) ======================= -->
+<section id="notificaciones" class="seccion">
+<h2>Notificaciones (Laboratorio 3)</h2>
+<p>Eventos publicados por Ventas en RabbitMQ y guardados por Notificaciones.</p>
+<label class="en-linea"><input type="checkbox" id="auto-notif">
+Actualizar cada 3 segundos</label>
+<button id="btn-notif" class="secundario">Actualizar</button>
+<ul id="lista-notificaciones" class="notificaciones"></ul>
+</section>
+<!-- ======================= Configuración ======================= -->
+<section id="config" class="seccion">
+<h2>Configuración</h2>
+<form id="form-config" class="formulario vertical">
+<!-- Dirección del API Gateway: local, Codespaces o la nube -->
+<label>URL del API Gateway
+<input id="config-url" placeholder="http://localhost:8080" required></label>
+<button type="submit">Guardar y probar</button>
+</form>
+<!-- Inicio de sesión: se usa a partir del Laboratorio 6 (JWT) -->
+<form id="form-login" class="formulario vertical">
+    <h3>Iniciar sesión (Laboratorio 6)</h3>
+<label>Usuario <input id="login-usuario" autocomplete="username"></label>
+<label>Contraseña <input id="login-contrasena" type="password"
+autocomplete="current-password"></label>
+
+<button type="submit">Entrar</button>
+<button type="button" id="btn-salir" class="secundario">Cerrar sesión</button>
+</form>
+<p id="info-sesion" class="resultado"></p>
+</section>
+</main>
+<!-- Los scripts van al final: cuando se ejecutan, el HTML ya existe -->
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
