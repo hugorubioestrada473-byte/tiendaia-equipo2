@@ -1,0 +1,7 @@
+# Servicio de IA (Laboratorio 2): entrena y sirve el modelo de demanda
+fastapi>=0.115 # framework de la API REST (incluye pydantic para validar)
+uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la aplicación FastAPI
+requests>=2.31 # cliente HTTP para pedir las ventas al servicio Ventas
+pandas>=2.2 # tablas (DataFrame) para preparar los datos
+scikit-learn>=1.5 # modelo RandomForest, one-hot, métricas MAE y R2
+joblib>=1.4 # guarda y carga el modelo entrenado en un archivo
