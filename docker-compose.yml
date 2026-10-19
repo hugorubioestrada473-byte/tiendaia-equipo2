@@ -1,0 +1,117 @@
+# TiendaIA - Laboratorio 2
+# Define todos los contenedores del sistema: 3 bases de datos, 4 microservicios
+# y el API Gateway. Se levanta con: docker compose up -d --build
+# Las contraseñas (${MYSQL_PASSWORD}...) se leen del archivo .env, no del código.
+
+# Bloque reutilizable (ancla YAML &servicio): opciones comunes de los microservicios.
+# Las claves que empiezan con "x-" Docker Compose las ignora; solo sirven de plantilla.
+x-servicio: &servicio
+  restart: unless-stopped   # reinicia si falla, salvo que se detenga a mano
+  build: &construir
+    context: .              # se construye con el Dockerfile de esta carpeta
+
+services:
+# ------------------------------ Bases de datos
+# MySQL: base relacional para Clientes
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: tienda    # base que se crea al iniciar por primera vez
+      MYSQL_USER: tienda        # usuario de la aplicación (no se usa root)
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    # Volumen con nombre: los datos sobreviven aunque se borre el contenedor
+    volumes: [mysql_data:/var/lib/mysql]
+    # healthcheck: Docker pregunta cada 5 s si MySQL ya acepta conexiones.
+    # Clientes espera a que esté "healthy" (MySQL tarda en arrancar).
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 20
+
+# MongoDB: base de documentos para Productos
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes: [mongo_data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      retries: 20
+
+# Redis: base clave-valor en memoria para Ventas
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # --appendonly yes: guarda cada escritura en disco para no perder datos al reiniciar
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redis_data:/data]
+
+# ------------------------------ Microservicios
+# Ninguno publica puertos (no hay "ports"): solo se alcanzan dentro de la red
+# interna de Compose, por su nombre (http://clientes:8000). Escuchan en el 8000.
+  clientes:
+    <<: *servicio   # copia las opciones comunes del ancla &servicio
+    # Misma imagen base, pero con SERVICIO=clientes (ver Dockerfile)
+    build: {<<: *construir, args: {SERVICIO: clientes}}
+    environment:
+      # "mysql" es el nombre del contenedor de la base: Compose lo resuelve por DNS
+      DATABASE_URL: mysql+pymysql://tienda:${MYSQL_PASSWORD}@mysql:3306/tienda
+    # No arranca hasta que el healthcheck de MySQL sea exitoso
+    depends_on: {mysql: {condition: service_healthy}}
+
+  productos:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: productos}}
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+    depends_on: {mongo: {condition: service_healthy}}
+
+  ventas:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: ventas}}
+    environment:
+      REDIS_HOST: redis
+    # Ventas llama a Clientes y Productos: se inician antes (solo orden de arranque)
+    depends_on: [redis, clientes, productos]
+
+  ia:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: ia_service}}
+    environment:
+      VENTAS_URL: http://ventas:8000   # de aquí obtiene los datos para entrenar
+      MODELO_PATH: /modelos/modelo.joblib
+    # El modelo entrenado se guarda en un volumen para no perderlo al recrear
+    volumes: [modelos:/modelos]
+    depends_on: [ventas]
+
+# ------------------------------ Punto de entrada
+  gateway:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: gateway}}
+    # Único puerto publicado: el 8080 de la máquina se conecta al 8000 del gateway.
+    # Desde fuera se usa http://localhost:8080/api/...
+    ports: ["8080:8000"]
+    environment:
+      # Orígenes que pueden llamar al gateway desde el navegador (CORS). "*" = todos;
+      # en la nube conviene poner la URL exacta del cliente web.
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on: [clientes, productos, ventas, ia]
+
+# ------------------------------ Cliente web
+# Nginx sirve los archivos estáticos de frontend/ (HTML, CSS y JS) tal cual.
+# Se abre en http://localhost:8081; el navegador llama al gateway en el 8080.
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    # :ro = solo lectura; al editar un archivo basta con recargar el navegador
+    volumes: ["./frontend:/usr/share/nginx/html:ro"]
+    ports: ["8081:80"]
+
+# Volúmenes con nombre: Docker los administra y conservan los datos
+volumes:
+  mysql_data:
+  mongo_data:
+  redis_data:
+  modelos:
