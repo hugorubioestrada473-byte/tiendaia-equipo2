@@ -1,0 +1,5 @@
+# Servicio Ventas (Laboratorio 2): API REST + Redis + llamadas a otros servicios
+fastapi>=0.115 # framework de la API REST (incluye pydantic para validar)
+uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la aplicación FastAPI
+redis>=5.0 # cliente de Redis, donde se guardan las ventas
+requests>=2.31 # cliente HTTP para consultar a Clientes y Productos
