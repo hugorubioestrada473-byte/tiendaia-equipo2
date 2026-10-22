@@ -5,7 +5,7 @@
 # (clientes, productos, ventas, ia_service, gateway...) se copia a la imagen.
 
 # Imagen base oficial de Python 3.12 en su versión "slim" (más ligera)
-FROM python:3.12-slim
+FROM python:3.11-slim
 
 # Argumento de construcción: lo pasa docker-compose.yml en build.args
 ARG SERVICIO
