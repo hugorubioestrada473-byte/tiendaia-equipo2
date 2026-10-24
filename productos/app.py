@@ -28,7 +28,7 @@ def siguiente_id() -> int:
 # MONGO_URL llega por variable de entorno (p. ej. mongodb://mongo:27017, donde
 # "mongo" es el nombre del contenedor en docker-compose.yml).
 # ["tienda"] selecciona la base de datos; MongoDB la crea al primer uso.
-db=MongoClient(os.environ["MONGO_URL"])["TIENDA"]
+db=MongoClient(os.environ["MONGO_URL"])["tienda"]
 
 db.productos.create_index("id", unique=True)
 app = FastAPI(title="TiendaIA - productos")
