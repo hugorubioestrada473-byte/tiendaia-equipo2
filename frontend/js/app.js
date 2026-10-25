@@ -226,20 +226,42 @@ await cargarProductos();
 async function cargarVentas() {
 [clientes, productos, ventas] = await Promise.all([
 Api.get("/api/clientes"), Api.get("/api/productos"), Api.get("/api/ventas")]);
-// Mapas id -> nombre para mostrar nombres en lugar de números
-const nomCliente = new Map(clientes.map(c => [c.id, c.nombre]));
-const nomProducto = new Map(productos.map(p => [p.id, p.nombre]));
-const recientes = [...ventas].reverse().slice(0, 100); // últimas 100
-$("tabla-ventas").replaceChildren(...recientes.map(v => fila(
-[v.id, v.fecha, nomCliente.get(v.cliente_id) ?? v.cliente_id,
-nomProducto.get(v.producto_id) ?? v.producto_id, v.cantidad, dinero.format(v.total)],
-[{ texto: "Eliminar", clase: "peligro", alHacerClic: () => eliminarVenta(v.id) }])));
+
+    async function cargarVentas() {
+[clientes, productos, ventas] = await Promise.all([
+Api.get("/api/clientes"), Api.get("/api/productos"), Api.get("/api/ventas")]);
+dibujarTablaVentas();
 llenarSelect($("venta-cliente"), clientes.map(c => ({ valor: c.id, texto: c.nombre })));
 const opcionesProducto = productos.map(p => ({ valor: p.id, texto: p.nombre }));
 llenarSelect($("venta-producto"), opcionesProducto);
 llenarSelect($("pred-producto"), opcionesProducto);
 ponerPrecioPrediccion();
 }
+
+
+
+llenarSelect($("venta-cliente"), clientes.map(c => ({ valor: c.id, texto: c.nombre })));
+const opcionesProducto = productos.map(p => ({ valor: p.id, texto: p.nombre }));
+llenarSelect($("venta-producto"), opcionesProducto);
+llenarSelect($("pred-producto"), opcionesProducto);
+ponerPrecioPrediccion();
+}
+
+/* Dibuja la tabla de ventas; si hay texto en "Buscar cliente", filtra por nombre. */
+function dibujarTablaVentas() {
+const nomCliente = new Map(clientes.map(c => [c.id, c.nombre]));
+const nomProducto = new Map(productos.map(p => [p.id, p.nombre]));
+const buscado = $("buscar-venta").value.trim().toLowerCase();
+const filtradas = ventas.filter(v =>
+String(nomCliente.get(v.cliente_id) ?? v.cliente_id).toLowerCase().includes(buscado));
+const recientes = [...filtradas].reverse().slice(0, 100); // últimas 100
+$("tabla-ventas").replaceChildren(...recientes.map(v => fila(
+[v.id, v.fecha, nomCliente.get(v.cliente_id) ?? v.cliente_id,
+nomProducto.get(v.producto_id) ?? v.producto_id, v.cantidad, dinero.format(v.total)],
+[{ texto: "Eliminar", clase: "peligro", alHacerClic: () => eliminarVenta(v.id) }])));
+}
+// Cada letra que se escribe en el campo vuelve a dibujar la tabla filtrada
+$("buscar-venta").addEventListener("input", dibujarTablaVentas);
 async function eliminarVenta(id) {
 if (!confirm(`¿Eliminar la venta ${id}?`)) return;
 await intentar(async () => {
@@ -327,6 +349,7 @@ $("kpi-clientes").textContent = clientes.length;
 $("kpi-productos").textContent = productos.length;
 $("kpi-ventas").textContent = ventas.length;
 $("kpi-ingresos").textContent = dinero.format(ingresos);
+$("kpi-ticket").textContent = dinero.format(ventas.length ? ingresos / ventas.length : 0);
 // Ingresos por mes: el mes es el texto entre los caracteres 5 y 7 de AAAA-MM-DD
 const porMes = new Array(12).fill(0);
 for (const v of ventas) porMes[Number(v.fecha.slice(5, 7)) - 1] += v.total;
