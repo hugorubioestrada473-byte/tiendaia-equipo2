@@ -18,7 +18,8 @@ WORKDIR /app
 COPY ${SERVICIO}/requirements.txt .
 
 # --no-cache-dir: no guarda los instaladores de pip, la imagen queda más pequeña
-RUN pip install --no-cache-dir -r requirements.txt
+# Instalación con reintentos y tiempo de espera extendido
+RUN pip install --no-cache-dir --default-timeout=1000 --retries 10 -r requirements.txt
 
 # Código compartido entre servicios (carpeta comun/) y luego el del servicio
 COPY comun/ .
