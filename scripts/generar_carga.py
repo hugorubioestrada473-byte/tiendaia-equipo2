@@ -1,10 +1,3 @@
-"""Genera clientes, productos y ventas sintéticas a través del API Gateway.
-Se usa desde el Laboratorio 2 para poblar TiendaIA con datos de prueba.
-Todas las peticiones pasan por el gateway (/api/...), igual que un cliente real.
-La demanda depende del producto, del mes (temporada) y del precio:
-el modelo de IA debe descubrir ese patrón.
-Uso: python scripts/generar_carga.py [URL_GATEWAY] [NUM_VENTAS]
-"""
 import os
 import random
 import sys
@@ -40,52 +33,71 @@ catalogo = {
     "Bocoles (docena)": (90.0, 6),
 }
 
-existentes = {
-    p["nombre"]
-    for p in sesion.get(f"{GW}/api/productos", timeout=TIEMPO_ESPERA).json()
-}
+# 1. Obtenemos los productos actuales de forma segura
+respuesta = sesion.get(f"{GW}/api/productos", timeout=TIEMPO_ESPERA)
+datos = respuesta.json()
+if datos is None:
+    datos = []
+existentes = {p["nombre"] for p in datos}
 
+# 2. Creamos los productos que falten y revisamos qué responde el servidor
 for nombre, (precio, _) in catalogo.items():
-    if nombre not in existentes:  # solo se crean los productos que faltan
-        sesion.post(
+    if nombre not in existentes:
+        r = sesion.post(
             f"{GW}/api/productos",
             timeout=TIEMPO_ESPERA,
             json={"nombre": nombre, "precio": precio},
         )
+        print(f"Creando '{nombre}' -> Status: {r.status_code}, Respuesta: {r.text}")
 
-clientes = sesion.get(f"{GW}/api/clientes", timeout=TIEMPO_ESPERA).json()
-productos = [
-    p
-    for p in sesion.get(f"{GW}/api/productos", timeout=TIEMPO_ESPERA).json()
+# 3. Obtenemos la lista definitiva de clientes protegiéndonos contra 'null'
+res_clientes = sesion.get(f"{GW}/api/clientes", timeout=TIEMPO_ESPERA).json()
+clientes = res_clientes if res_clientes is not None else []
+
+# 4. Obtenemos la lista definitiva de productos con sus IDs reales
+res_productos = sesion.get(f"{GW}/api/productos", timeout=TIEMPO_ESPERA)
+productos = res_productos.json()
+if productos is None:
+    productos = []
+
+# Mapeo de ID de producto a su demanda base
+base = {
+    p["id"]: catalogo[p["nombre"]][1] 
+    for p in productos 
     if p["nombre"] in catalogo
-]
-
-base = {p["id"]: catalogo[p["nombre"]][1] for p in productos}  # id -> demanda base
+}
 temporada = {12: 1.8, 11: 1.4, 1: 1.2, 7: 1.3}  # diciembre vende más
 
+# Inspeccionemos qué productos está viendo el script justo antes de vender
+print("Productos detectados por el script:", productos)
+# ---------------------------------------------------------------- Ventas
 # ---------------------------------------------------------------- Ventas
 errores = 0
-for _ in range(N):
-    p = random.choice(productos)
-    mes = random.randint(1, 12)
-    # cantidad = demanda base x factor de temporada + ruido normal (gauss)
-    cantidad = max(
-        1,
-        round(base[p["id"]] * temporada.get(mes, 1.0) + random.gauss(0, 1.5)),
-    )
-    r = sesion.post(
-        f"{GW}/api/ventas",
-        timeout=TIEMPO_ESPERA,
-        json={
+if productos and clientes:
+    for _ in range(N):
+        p = random.choice(productos)
+        mes = random.randint(1, 12)
+        demanda_base = base.get(p["id"], 5)
+        cantidad = max(
+            1,
+            round(demanda_base * temporada.get(mes, 1.0) + random.gauss(0, 1.5)),
+        )
+        payload = {
             "cliente_id": random.choice(clientes)["id"],
             "producto_id": p["id"],
             "cantidad": cantidad,
             "fecha": date(2025, mes, random.randint(1, 28)).isoformat(),
-        },
-    )
-    errores += r.status_code != 201  # 201 Created = la venta se registró
+        }
+        r = sesion.post(
+            f"{GW}/api/ventas",
+            timeout=TIEMPO_ESPERA,
+            json=payload,
+        )
+        
+        # Imprimir el error de la primera venta fallida para diagnosticar
+        if r.status_code != 201 and errores == 0:
+            print(f"DEBUG Error en venta -> Status: {r.status_code}, Respuesta: {r.text}, Payload enviado: {payload}")
 
-print(
-    f"clientes={len(clientes)} productos={len(productos)} "
-    f"ventas={N - errores} errores={errores}"
-)
+        errores += r.status_code != 201
+else:
+    print("Aviso: No hay productos o clientes disponibles para registrar ventas.")
