@@ -1,5 +1,6 @@
-# Servicio Ventas (Laboratorio 2): API REST + Redis + llamadas a otros servicios
-fastapi>=0.115 # framework de la API REST (incluye pydantic para validar)
-uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la aplicación FastAPI
-redis>=5.0 # cliente de Redis, donde se guardan las ventas
-requests>=2.31 # cliente HTTP para consultar a Clientes y Productos
+# Dependencias del servicio Ventas (Laboratorio 3). Docker las instala al construir.
+fastapi>=0.115 # framework web: endpoints /ventas y validación con pydantic
+uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la app FastAPI (CMD del Dockerfile)
+redis>=5.0 # cliente de Redis: guarda las ventas (incr, set, listas)
+requests>=2.31 # cliente HTTP: valida cliente y producto en sus microservicios
+pika>=1.3 # cliente de RabbitMQ (AMQP): publica el evento venta.creada
