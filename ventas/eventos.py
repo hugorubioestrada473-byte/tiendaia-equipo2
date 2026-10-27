@@ -13,7 +13,7 @@ RABBIT = os.getenv("RABBITMQ_HOST", "rabbitmq")
 # Nombre del host (local) o URL amqp(s):// de un servicio administrado (CloudAMQP)
 PARAMS = (pika.URLParameters(RABBIT) if "://" in RABBIT
 else pika.ConnectionParameters(RABBIT))
-EXCHANGE = "tienda.eventos"
+EXCHANGE = "tienda.events"
 def publicar(clave: str, datos: dict) -> bool:
     """Publica un evento; si el broker no responde, la venta NO se pierde.
     Recibe la routing key (p. ej. "venta.creada") y los datos del evento.
