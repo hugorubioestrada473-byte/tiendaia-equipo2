@@ -11,6 +11,7 @@ import redis
 import requests  # cliente HTTP para llamar a otros microservicios
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from eventos import publicar  # publicación de eventos en RabbitMQ (Lab. 3)
 
 # ---------------------------------------------------------------- Configuración
 # Conexión a Redis. "redis" es el nombre del contenedor en docker-compose.yml.
@@ -76,8 +77,8 @@ def crear(v: VentaIn):
     # INCR: suma 1 a la clave de forma atómica y devuelve el nuevo valor.
     # Sirve como id autoincremental sin repetidos, aun con peticiones simultáneas.
     venta_id = r.incr("venta:siguiente_id")
-
-    # Se guarda el precio del momento de la venta (si después cambia el precio
+     # Lab. 3
+# Se guarda el precio del momento de la venta (si después cambia el precio
     # del producto, la venta conserva el valor original).
     venta = {
         "id": venta_id,
@@ -90,6 +91,7 @@ def crear(v: VentaIn):
     # Cada venta es una clave de texto "venta:<id>" con el JSON como valor
     r.set(f"venta:{venta_id}", json.dumps(venta))
     r.rpush("ventas", venta_id)  # lista ordenada de ids
+    venta["evento_publicado"] = publicar("venta.creada", venta) # Lab. 3
     return venta
 
 
