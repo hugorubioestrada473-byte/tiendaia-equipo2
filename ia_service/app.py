@@ -16,6 +16,7 @@ from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder
+from cola import router as cola_router 
 
 # ---------------------------------------------------------------- Configuración
 VENTAS_URL = os.getenv("VENTAS_URL", "http://ventas:8000")
@@ -26,7 +27,7 @@ MODELO = Path(os.getenv("MODELO_PATH", "/modelos/modelo.joblib"))
 COLUMNAS = ["producto_id", "mes", "precio"]  # variables de entrada (features)
 
 app = FastAPI(title="TiendaIA - Servicio de IA")
-
+app.include_router(cola_router) 
 
 def preparar(ventas: list[dict]) -> pd.DataFrame:
     """Convierte la lista de ventas (JSON) en un DataFrame y agrega la columna mes.
