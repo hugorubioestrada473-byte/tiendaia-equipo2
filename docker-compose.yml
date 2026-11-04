@@ -1,36 +1,25 @@
-# TiendaIA - Laboratorio 2
-# Define todos los contenedores del sistema: 3 bases de datos, 4 microservicios
-# y el API Gateway. Se levanta con: docker compose up -d --build
-# Las contraseñas (${MYSQL_PASSWORD}...) se leen del archivo .env, no del código.
-
-# Bloque reutilizable (ancla YAML &servicio): opciones comunes de los microservicios.
-# Las claves que empiezan con "x-" Docker Compose las ignora; solo sirven de plantilla.
+# TiendaIA - Laboratorio 3 (Completo corregido)
 x-servicio: &servicio
-  restart: unless-stopped   # reinicia si falla, salvo que se detenga a mano
+  restart: unless-stopped
   build: &construir
-    context: .              # se construye con el Dockerfile de esta carpeta
+    context: .
 
 services:
 # ------------------------------ Bases de datos
-# MySQL: base relacional para Clientes
   mysql:
     image: mysql:8.4
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: tienda    # base que se crea al iniciar por primera vez
-      MYSQL_USER: tienda        # usuario de la aplicación (no se usa root)
+      MYSQL_DATABASE: tienda
+      MYSQL_USER: tienda
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    # Volumen con nombre: los datos sobreviven aunque se borre el contenedor
     volumes: [mysql_data:/var/lib/mysql]
-    # healthcheck: Docker pregunta cada 5 s si MySQL ya acepta conexiones.
-    # Clientes espera a que esté "healthy" (MySQL tarda en arrancar).
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       retries: 20
 
-# MongoDB: base de documentos para Productos
   mongo:
     image: mongo:7
     restart: unless-stopped
@@ -40,25 +29,28 @@ services:
       interval: 5s
       retries: 20
 
-# Redis: base clave-valor en memoria para Ventas
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    # --appendonly yes: guarda cada escritura en disco para no perder datos al reiniciar
     command: ["redis-server", "--appendonly", "yes"]
     volumes: [redis_data:/data]
 
+# ------------------------------ Broker de mensajes
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: unless-stopped
+    ports: ["127.0.0.1:15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 10
+
 # ------------------------------ Microservicios
-# Ninguno publica puertos (no hay "ports"): solo se alcanzan dentro de la red
-# interna de Compose, por su nombre (http://clientes:8000). Escuchan en el 8000.
   clientes:
-    <<: *servicio   # copia las opciones comunes del ancla &servicio
-    # Misma imagen base, pero con SERVICIO=clientes (ver Dockerfile)
+    <<: *servicio
     build: {<<: *construir, args: {SERVICIO: clientes}}
     environment:
-      # "mysql" es el nombre del contenedor de la base: Compose lo resuelve por DNS
       DATABASE_URL: mysql+pymysql://tienda:${MYSQL_PASSWORD}@mysql:3306/tienda
-    # No arranca hasta que el healthcheck de MySQL sea exitoso
     depends_on: {mysql: {condition: service_healthy}}
 
   productos:
@@ -73,94 +65,67 @@ services:
     build: {<<: *construir, args: {SERVICIO: ventas}}
     environment:
       REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
-    # Ventas llama a Clientes y Productos: se inician antes (solo orden de arranque)
-    depends_on: [redis, clientes, productos]
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+    depends_on: [redis, clientes, productos, rabbitmq]
 
   ia:
     <<: *servicio
     build: {<<: *construir, args: {SERVICIO: ia_service}}
     environment:
-      VENTAS_URL: http://ventas:8000   # de aquí obtiene los datos para entrenar
+      VENTAS_URL: http://ventas:8000
       MODELO_PATH: /modelos/modelo.joblib
       REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
-    # El modelo entrenado se guarda en un volumen para no perderlo al recrear
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
     volumes: [modelos:/modelos]
-    depends_on: [ventas]
+    depends_on: [ventas, rabbitmq]
+
+  notificaciones:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: notificaciones}}
+    environment: 
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+    depends_on: {rabbitmq: {condition: service_healthy}}
+
+  worker:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: ia_service}}
+    command: ["python", "worker.py"]
+    environment:
+      MODELO_PATH: /modelos/modelo.joblib
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RETARDO_MS: "200"
+    volumes: [modelos:/modelos]
+    depends_on: {rabbitmq: {condition: service_healthy}}
+
+  ia_listener:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: ia_listener}}
+    command: ["python", "listener.py"]
+    environment: 
+      REDIS_HOST: redis 
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq} 
+      IA_URL: "http://ia:8000"
+    depends_on: {rabbitmq: {condition: service_healthy}}
 
 # ------------------------------ Punto de entrada
   gateway:
     <<: *servicio
     build: {<<: *construir, args: {SERVICIO: gateway}}
-    # Único puerto publicado: el 8080 de la máquina se conecta al 8000 del gateway.
-    # Desde fuera se usa http://localhost:8080/api/...
     ports: ["8080:8000"]
     environment:
-      # Orígenes que pueden llamar al gateway desde el navegador (CORS). "*" = todos;
-      # en la nube conviene poner la URL exacta del cliente web.
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
-    depends_on: [clientes, productos, ventas, ia]
+    depends_on: [clientes, productos, ventas, ia, rabbitmq]
 
 # ------------------------------ Cliente web
-# Nginx sirve los archivos estáticos de frontend/ (HTML, CSS y JS) tal cual.
-# Se abre en http://localhost:8081; el navegador llama al gateway en el 8080.
   web:
     image: nginx:1.27-alpine
     restart: unless-stopped
-    # :ro = solo lectura; al editar un archivo basta con recargar el navegador
     volumes: ["./frontend:/usr/share/nginx/html:ro"]
     ports: ["8081:80"]
 
-# Agregar a docker-compose.yml (Laboratorio 3)
-# Estos bloques van dentro de "services:" del docker-compose.yml del Laboratorio 2.
-# Reutilizan las anclas &servicio y &construir definidas allí (x-servicio).
-# ------------------------------------------------------------ Broker de mensajes
-# RabbitMQ recibe, guarda y reparte los mensajes entre productores y consumidores.
-# La imagen "management" incluye un panel web para ver colas, exchanges y mensajes.
-  rabbitmq:
-    image: rabbitmq:4-management
-    restart: unless-stopped
-    # 15672 es el panel web. Se publica solo en 127.0.0.1 para que nadie de la red
-    # pueda entrar. El puerto AMQP (5672) NO se publica: solo lo usan los servicios
-    # dentro de la red interna de Docker Compose.
-    ports: ["127.0.0.1:15672:15672"] # panel web solo desde tu máquina
-    # El healthcheck indica cuándo el broker ya acepta conexiones; los servicios
-    # que dependen de él esperan a que esté "healthy" antes de arrancar.
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      retries: 10
-# ------------------------------------------------------------ Suscriptor de eventos
-# Notificaciones escucha los eventos "venta.*" que publica Ventas (Pub/Sub) y
-# guarda los avisos en Redis. Usa la misma imagen común con SERVICIO=notificaciones.
-  notificaciones:
-    <<: *servicio
-    build: {<<: *construir, args: {SERVICIO: notificaciones}}
-    # Los hosts se llaman por el nombre del servicio dentro de la red de Compose
-    environment: {REDIS_HOST: redis, RABBITMQ_HOST: rabbitmq}
-    depends_on: {rabbitmq: {condition: service_healthy}}
-# ------------------------------------------------------------ Worker de inferencia
-# Proceso que consume la cola de trabajo "inferencias". Usa el MISMO código e
-# imagen que el servicio de IA, pero arranca worker.py en lugar de uvicorn.
-# Se pueden lanzar varias copias: docker compose up -d --scale worker=3
-  worker:
-    <<: *servicio
-    build: {<<: *construir, args: {SERVICIO: ia_service}}
-    command: ["python", "worker.py"] # reemplaza el CMD (uvicorn) del Dockerfile
-    environment:
-      MODELO_PATH: /modelos/modelo.joblib # modelo entrenado por el servicio de IA
-      REDIS_HOST: redis # donde se escribe el resultado
-      RABBITMQ_HOST: rabbitmq # de donde se leen las solicitudes
-      RETARDO_MS: "200" # pausa artificial: simula un modelo pesado
-    # Volumen compartido con "ia": el worker lee el modelo que "ia" guardó al entrenar
-    volumes: [modelos:/modelos]
-    depends_on: {rabbitmq: {condition: service_healthy}}
-# Y en los servicios existentes:
-# ventas -> environment: RABBITMQ_HOST: rabbitmq
-# ia -> environment: REDIS_HOST: redis, RABBITMQ_HOST: rabbitmq
-
-# Volúmenes con nombre: Docker los administra y conservan los datos
+# ------------------------------ Volúmenes
 volumes:
   mysql_data:
   mongo_data:
