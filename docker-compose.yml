@@ -1,0 +1,163 @@
+# TiendaIA - Laboratorio 3 (Completo corregido)
+x-servicio: &servicio
+  restart: unless-stopped
+  build: &construir
+    context: .
+
+services:
+# ------------------------------ Bases de datos
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: tienda
+      MYSQL_USER: tienda
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes: [mysql_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 20
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes: [mongo_data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redis_data:/data]
+
+# ------------------------------ Broker de mensajes
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: unless-stopped
+    ports: ["127.0.0.1:15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 10
+
+# ------------------------------ Microservicios
+  clientes:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: clientes}}
+    environment:
+      DATABASE_URL: mysql+pymysql://tienda:${MYSQL_PASSWORD}@mysql:3306/tienda
+    depends_on: {mysql: {condition: service_healthy}}
+
+  productos:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: productos}}
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+    depends_on: {mongo: {condition: service_healthy}}
+
+  ventas:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: ventas}}
+    environment:
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+    depends_on: [redis, clientes, productos, rabbitmq]
+
+  ia:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: ia_service}}
+    environment:
+      VENTAS_URL: http://ventas:8000
+      MODELO_PATH: /modelos/modelo.joblib
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+    volumes: [modelos:/modelos]
+    depends_on: [ventas, rabbitmq]
+
+  notificaciones:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: notificaciones}}
+    environment: 
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+    depends_on: {rabbitmq: {condition: service_healthy}}
+
+  seaweedfs:
+    image: chrislusf/seaweedfs
+    restart: unless-stopped
+    # -volume.max: máximo de volúmenes; -master.volumeSizeLimitMB: tamaño de
+    # cada volumen; -s3.config: archivo con identidades (llaves) y permisos.
+    # ">-" une las líneas siguientes en una sola (mismo comando, solo más legible).
+    command: >-
+      server -dir=/data -volume.max=100 -master.volumeSizeLimitMB=1024
+      -s3 -s3.config=/etc/seaweedfs/s3.json
+    # 8333 = puerto de la API S3. Se publica porque el navegador descarga las
+    # imágenes directamente de aquí con las URL prefirmadas.
+    ports: ["8333:8333"]
+    volumes:
+      - seaweed_data:/data
+      - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro # :ro = solo lectura
+    # Microservicio Imágenes: sube y borra objetos y firma URL de descarga.
+  imagenes:
+    <<: *servicio # restart común a todos
+    build: {<<: *construir, args: {SERVICIO: imagenes}}
+    environment:
+      S3_ENDPOINT: http://seaweedfs:8333 # red interna de Docker
+      S3_PUBLIC_ENDPOINT: http://localhost:8333 # el navegador descarga desde aquí
+      S3_BUCKET: tiendaia-imagenes
+      S3_ACCESS_KEY: ${S3_ADMIN_KEY} # Lab. 6: cambiar a identidad propia
+      S3_SECRET_KEY: ${S3_ADMIN_SECRET} # valores tomados del archivo .env
+      # Orden de arranque: primero S3 y Productos (Imágenes llama a ambos)
+    depends_on: [seaweedfs, productos]
+    # Y en volumes: seaweed_data:
+
+  worker:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: ia_service}}
+    command: ["python", "worker.py"]
+    environment:
+      MODELO_PATH: /modelos/modelo.joblib
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RETARDO_MS: "200"
+    volumes: [modelos:/modelos]
+    depends_on: {rabbitmq: {condition: service_healthy}}
+
+  ia_listener:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: ia_listener}}
+    command: ["python", "listener.py"]
+    environment: 
+      REDIS_HOST: redis 
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq} 
+      IA_URL: "http://ia:8000"
+    depends_on: {rabbitmq: {condition: service_healthy}}
+
+# ------------------------------ Punto de entrada
+  gateway:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: gateway}}
+    ports: ["8080:8000"]
+    environment:
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on: [clientes, productos, ventas, ia, rabbitmq]
+
+# ------------------------------ Cliente web
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes: ["./frontend:/usr/share/nginx/html:ro"]
+    ports: ["8081:80"]
+
+# ------------------------------ Volúmenes
+volumes:
+  mysql_data:
+  mongo_data:
+  redis_data:
+  modelos:
+  seaweed_data:
