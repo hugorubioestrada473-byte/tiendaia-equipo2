@@ -1,0 +1,6 @@
+# Microservicio Imágenes (Laboratorio 4)
+fastapi>=0.115 # framework web: define los endpoints /imagenes y /health
+uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la aplicación FastAPI
+requests>=2.31 # cliente HTTP para consultar y actualizar a Productos
+boto3>=1.34 # SDK de AWS: habla con SeaweedFS (o cualquier API S3)
+python-multipart>=0.0.9 # FastAPI lo necesita para leer formularios con archivos

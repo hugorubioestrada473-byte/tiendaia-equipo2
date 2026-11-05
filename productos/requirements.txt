@@ -1,0 +1,4 @@
+# Microservicio Productos (Laboratorio 4: agrega PUT /productos/{id}/imagen)
+fastapi>=0.115 # framework web: CRUD de productos (incluye pydantic)
+uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la aplicación FastAPI
+pymongo>=4.6 # cliente de MongoDB, donde se guarda el catálogo e imagen_key
