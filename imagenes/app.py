@@ -99,5 +99,5 @@ def producto(pid: int) -> dict:
 def asociar(pid: int, clave: str | None):
     """Guarda la clave del objeto en Productos (None = producto sin imagen)."""
     r = sesion.put(f"{PRODUCTOS_URL}/productos/{pid}/imagen",
-                   json={"imagen_key": clave}, timeout=TIEMPO_ESPERA)
+        json={"imagen_key": clave}, timeout=TIEMPO_ESPERA)
     r.raise_for_status()

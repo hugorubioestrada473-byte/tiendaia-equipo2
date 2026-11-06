@@ -4,13 +4,13 @@ elementos del HTML. Un selector (.clase, #id, etiqueta) elige a qué
 elementos se aplica cada bloque de reglas. */
 /* Variables de CSS: se definen una vez y se reutilizan con var(--nombre) */
 :root {
---azul: #fcb4f7;
+--azul: #2563eb;
 --azul-claro: #e8eef7;
---verde: #68c1e7;
+--verde: #2e7d32;
 --rojo: #b23b3b;
---gris: #a2bcef;
---texto: #0e1115;
---borde: #3e6bb5;
+--gris: #f4f5f7;
+--texto: #1f2933;
+--borde: #d0d7e2;
 }
 /* box-sizing: el ancho incluye relleno y borde (más fácil de calcular) */
 * { box-sizing: border-box; }
