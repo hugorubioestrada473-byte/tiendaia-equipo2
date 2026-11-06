@@ -1,0 +1,142 @@
+# TiendaIA - Laboratorio 4
+services:
+# ------------------------------ Bases de datos
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: tienda
+      MYSQL_USER: tienda
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes: [mysql_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 20
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes: [mongo_data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redis_data:/data]
+
+# ------------------------------ Broker de mensajes
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: unless-stopped
+    ports: ["127.0.0.1:15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 10
+
+# ------------------------------ Microservicios
+  clientes:
+    restart: unless-stopped
+    build: {context: ., args: {SERVICIO: clientes}}
+    environment:
+      DATABASE_URL: mysql+pymysql://tienda:${MYSQL_PASSWORD}@mysql:3306/tienda
+    depends_on: {mysql: {condition: service_healthy}}
+
+  productos:
+    restart: unless-stopped
+    build: {context: ., args: {SERVICIO: productos}}
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+    depends_on: {mongo: {condition: service_healthy}}
+
+  ventas:
+    restart: unless-stopped
+    build: {context: ., args: {SERVICIO: ventas}}
+    environment:
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+    depends_on: [redis, clientes, productos, rabbitmq]
+
+  ia:
+    restart: unless-stopped
+    build: {context: ., args: {SERVICIO: ia_service}}
+    environment:
+      VENTAS_URL: http://ventas:8000
+      MODELO_PATH: /modelos/modelo.joblib
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+    volumes: [modelos:/modelos]
+    depends_on: [ventas, rabbitmq]
+
+  seaweedfs:
+    image: chrislusf/seaweedfs
+    restart: unless-stopped
+    command: >-
+      server -dir=/data -volume.max=100 -master.volumeSizeLimitMB=1024
+      -s3 -s3.config=/etc/seaweedfs/s3.json
+    ports: ["8333:8333"]
+    volumes:
+      - seaweed_data:/data
+      - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro
+
+  imagenes:
+    restart: unless-stopped
+    build: {context: ., args: {SERVICIO: imagenes}}
+    environment:
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_PUBLIC_ENDPOINT: http://localhost:8333
+      S3_BUCKET: tiendaia-imagenes
+      S3_ACCESS_KEY: ${S3_ADMIN_KEY}
+      S3_SECRET_KEY: ${S3_ADMIN_SECRET}
+    depends_on: [seaweedfs, productos]
+
+  worker:
+    restart: unless-stopped
+    build: {context: ., args: {SERVICIO: ia_service}}
+    command: ["python", "worker.py"]
+    environment:
+      MODELO_PATH: /modelos/modelo.joblib
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RETARDO_MS: "200"
+    volumes: [modelos:/modelos]
+    depends_on: {rabbitmq: {condition: service_healthy}}
+
+  ia_listener:
+    restart: unless-stopped
+    build: {context: ., args: {SERVICIO: integrador}}
+    command: ["python", "listener.py"]
+    environment:
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      IA_URL: "http://ia:8000"
+    depends_on: {rabbitmq: {condition: service_healthy}}
+
+# ------------------------------ Punto de entrada
+  gateway:
+    restart: unless-stopped
+    build: {context: ., args: {SERVICIO: gateway}}
+    ports: ["8080:8000"]
+    environment:
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on: [clientes, productos, ventas, ia, rabbitmq, imagenes]
+
+# ------------------------------ Cliente web
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes: ["./frontend:/usr/share/nginx/html:ro"]
+    ports: ["8081:80"]
+
+volumes:
+  mysql_data:
+  mongo_data:
+  redis_data:
+  modelos:
+  seaweed_data:
