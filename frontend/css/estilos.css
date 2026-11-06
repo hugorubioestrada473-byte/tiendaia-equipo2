@@ -1,0 +1,137 @@
+/* Estilos del cliente web de TiendaIA.
+CSS describe la APARIENCIA: colores, tamaños, márgenes y acomodo de los
+elementos del HTML. Un selector (.clase, #id, etiqueta) elige a qué
+elementos se aplica cada bloque de reglas. */
+/* Variables de CSS: se definen una vez y se reutilizan con var(--nombre) */
+:root {
+--azul: #fcb4f7;
+--azul-claro: #e8eef7;
+--verde: #68c1e7;
+--rojo: #b23b3b;
+--gris: #a2bcef;
+--texto: #0e1115;
+--borde: #3e6bb5;
+}
+/* box-sizing: el ancho incluye relleno y borde (más fácil de calcular) */
+* { box-sizing: border-box; }
+body {
+margin: 0;
+font-family: system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+color: var(--texto);
+background: var(--gris);
+}
+/* ---------------------------------------------------------- Encabezado */
+.encabezado {
+display: flex; /* flexbox: acomoda los hijos en una fila */
+flex-wrap: wrap; /* si no caben, pasan a la siguiente línea */
+align-items: center;
+gap: 12px;
+padding: 12px 20px;
+background: var(--azul);
+color: white;
+}
+.encabezado h1 { margin: 0; font-size: 1.4rem; }
+.menu { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.menu button { background: transparent; border: 1px solid #ffffff66; }
+.menu button.activo { background: white; color: var(--azul); }
+/* Indicador de conexión: el color depende de la clase que pone app.js */
+.estado { padding: 2px 10px; border-radius: 12px; font-size: 0.85rem; }
+.estado.conectado { background: var(--verde); }
+.estado.error { background: var(--rojo); }
+.estado.desconocido { background: #ffffff33; }
+/* ---------------------------------------------------------- Secciones */
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.seccion { display: none; } /* todas ocultas... */
+.seccion.visible { display: block; } /* ...salvo la que tiene la clase visible */
+h2 { color: var(--azul); }
+/* Tarjetas de indicadores: grid crea columnas que se ajustan al ancho */
+.tarjetas {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+gap: 12px;
+margin-bottom: 16px;
+}
+.tarjeta, .caja {
+background: white;
+border: 1px solid var(--borde);
+border-radius: 8px;
+padding: 14px;
+}
+.tarjeta span { display: block; color: #52606d; font-size: 0.9rem; }
+.tarjeta strong { font-size: 1.8rem; color: var(--azul); }
+.rejilla {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+gap: 16px;
+margin-bottom: 16px;
+}
+canvas { width: 100%; height: auto; } /* la gráfica se adapta al ancho */
+/* ---------------------------------------------------------- Formularios */
+.formulario {
+display: flex;
+flex-wrap: wrap;
+align-items: flex-end;
+gap: 10px;
+background: white;
+border: 1px solid var(--borde);
+border-radius: 8px;
+padding: 12px;
+margin-bottom: 12px;
+}
+.formulario.vertical { flex-direction: column; align-items: stretch; }
+.formulario h3 { width: 100%; margin: 0; }
+label { display: flex; flex-direction: column; font-size: 0.9rem; gap: 4px; }
+label.en-linea { flex-direction: row; align-items: center; }
+input, select {
+padding: 6px 8px;
+border: 1px solid var(--borde);
+border-radius: 6px;
+font-size: 0.95rem;
+}
+/* :invalid se activa cuando el campo no cumple required, min, type... */
+input:invalid { border-color: #e0a0a0; }
+button {
+padding: 7px 14px;
+border: none;
+border-radius: 6px;
+background: var(--azul);
+color: white;
+cursor: pointer; /* manita al pasar el ratón */
+}
+button:hover { opacity: 0.9; }
+button.secundario { background: #52606d; }
+button.peligro { background: var(--rojo); }
+/* ---------------------------------------------------------- Tablas */
+table {
+width: 100%;
+border-collapse: collapse; /* bordes sencillos entre celdas */
+background: white;
+margin-bottom: 12px;
+}
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--borde); text-align: left; }
+th { background: var(--azul-claro); }
+td button { padding: 3px 8px; font-size: 0.8rem; margin-right: 4px; }
+td img { max-height: 40px; border-radius: 4px; }
+/* ---------------------------------------------------------- Mensajes */
+.mensaje {
+max-width: 1100px;
+margin: 10px auto 0;
+padding: 10px 14px;
+border-radius: 6px;
+}
+.mensaje.exito { background: #e3f4e4; border: 1px solid var(--verde); }
+.mensaje.error { background: #fbe6e6; border: 1px solid var(--rojo); }
+.oculto { display: none; }
+.resultado { font-weight: bold; color: var(--azul); }
+.servicios, .notificaciones { list-style: none; padding: 0; }
+.servicios li, .notificaciones li {
+padding: 4px 0;
+border-bottom: 1px dashed var(--borde);
+}
+.ok { color: var(--verde); }
+.caido { color: var(--rojo); }
+/* Pantallas angostas (celular): menú a todo lo ancho */
+@media (max-width: 600px) {
+.menu { margin-left: 0; }
+table { font-size: 0.85rem; }
+}
