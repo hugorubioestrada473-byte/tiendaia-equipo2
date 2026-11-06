@@ -19,6 +19,7 @@ RUTAS = {
     "ventas": os.getenv("VENTAS_URL", "http://ventas:8000"),
     "ia": os.getenv("IA_URL", "http://ia:8000"),
     "imagenes": os.getenv("IMAGENES_URL", "http://imagenes:8000"),  # Lab. 4
+    "notificaciones": os.getenv("NOTIF_URL", "http://notificaciones:8000"),
 }
 
 app = FastAPI(title="TiendaIA - API Gateway")
