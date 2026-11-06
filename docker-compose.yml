@@ -1,3 +1,4 @@
+# TiendaIA - Laboratorio 4
 # TiendaIA - Laboratorio 3 (Completo corregido)
 x-servicio: &servicio
   restart: unless-stopped
@@ -145,7 +146,7 @@ services:
     ports: ["8080:8000"]
     environment:
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
-    depends_on: [clientes, productos, ventas, ia, rabbitmq]
+    depends_on: [clientes, productos, ventas, ia, rabbitmq, imagenes]
 
 # ------------------------------ Cliente web
   web:
