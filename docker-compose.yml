@@ -108,13 +108,17 @@ services:
     <<: *servicio # restart común a todos
     build: {<<: *construir, args: {SERVICIO: imagenes}}
     environment:
-      S3_ENDPOINT: http://seaweedfs:8333 # red interna de Docker
-      S3_PUBLIC_ENDPOINT: http://localhost:8333 # el navegador descarga desde aquí
-      S3_BUCKET: tiendaia-imagenes
-      S3_ACCESS_KEY: ${S3_ADMIN_KEY} # Lab. 6: cambiar a identidad propia
-      S3_SECRET_KEY: ${S3_ADMIN_SECRET} # valores tomados del archivo .env
-      # Orden de arranque: primero S3 y Productos (Imágenes llama a ambos)
-    depends_on: [seaweedfs, productos]
+      - ALMACEN=azure
+      - AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+      - AZURE_PUBLIC_ENDPOINT=http://localhost:10000/devstoreaccount1
+      - AZURE_CONTAINER_NAME=bench-contenedor
+      - S3_ENDPOINT=http://seaweedfs:8333
+      - S3_PUBLIC_ENDPOINT=http://localhost:8333
+      - S3_BUCKET=tiendaia-imagenes
+      - S3_ACCESS_KEY=${S3_ADMIN_KEY}
+      - S3_SECRET_KEY=${S3_ADMIN_SECRET}
+    # Orden de arranque: Azurite, S3 y Productos
+    depends_on: [azurite, seaweedfs, productos]
     # Y en volumes: seaweed_data:
 
   worker:
@@ -138,6 +142,13 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq} 
       IA_URL: "http://ia:8000"
     depends_on: {rabbitmq: {condition: service_healthy}}
+    
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    restart: unless-stopped
+    command: azurite-blob --blobHost 0.0.0.0
+    ports:
+      - "10000:10000"
 
 # ------------------------------ Punto de entrada
   gateway:

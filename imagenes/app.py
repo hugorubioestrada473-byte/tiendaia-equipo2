@@ -1,8 +1,8 @@
 """Microservicio Imágenes de TiendaIA (Laboratorio 4).
 Guarda las fotos de los productos en un almacenamiento de objetos con API S3
-(SeaweedFS en el laboratorio) y entrega URL prefirmadas para descargarlas.
+(SeaweedFS en el laboratorio) o Azure Blob Storage y entrega URL prefirmadas/SAS para descargarlas.
 Consulta y actualiza al microservicio Productos por HTTP con requests; la
-lógica de S3 vive en almacen.py.
+lógica de almacenamiento vive en sus respectivos adaptadores.
 """
 import hashlib  # huella SHA-256 para verificar la integridad del archivo
 import os
@@ -11,16 +11,28 @@ import uuid  # nombres únicos: dos fotos nunca se sobrescriben entre sí
 import requests  # cliente HTTP para llamar al microservicio Productos
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
-from almacen import AlmacenS3  # adaptador S3 (subir, url, eliminar)
+from almacen import AlmacenS3
+from almacen_azure import AlmacenAzure  # <-- Importación directa sin el paquete 'imagenes.'
 
 # ---------------------------------------------------------------- Configuración
 PRODUCTOS_URL = os.getenv("PRODUCTOS_URL", "http://productos:8000")
 # Tipos MIME aceptados -> extensión del archivo que se guarda en el bucket
 TIPOS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 MAX_BYTES = 5 * 1024 * 1024  # 5 MB: límite para no llenar el almacenamiento
-EXPIRA_S = 3600  # validez de la URL prefirmada (1 hora)
+EXPIRA_S = 3600  # validez de la URL prefirmada/SAS (1 hora)
 
-almacen = AlmacenS3()  # al arrancar se conecta a S3 y revisa el bucket
+# Selección del adaptador según la variable de entorno ALMACEN
+tipo_almacen = os.getenv("ALMACEN", "s3").lower()
+
+if tipo_almacen == "s3":
+    almacen = AlmacenS3()
+elif tipo_almacen == "azure":
+    almacen = AlmacenAzure()
+else:
+    raise ValueError(
+        f"Configuración de ALMACEN no válida: '{tipo_almacen}'. Se esperaba 's3' o 'azure'."
+    )
+
 TIEMPO_ESPERA = 5  # segundos máximos de espera a Productos
 sesion = requests.Session()  # reutiliza conexiones TCP con Productos
 
@@ -42,12 +54,12 @@ async def subir(producto_id: int = Form(gt=0), archivo: UploadFile = File(...)):
     if len(datos) > MAX_BYTES:  # 413 = la carga es demasiado grande
         raise HTTPException(413, "La imagen excede 5 MB")
 
-    # Clave = "ruta" del objeto dentro del bucket. S3 no tiene carpetas reales:
+    # Clave = "ruta" del objeto dentro del bucket. S3/Azure no tienen carpetas reales:
     # el prefijo productos/<id>/ solo agrupa las claves de cada producto.
     clave = f"productos/{producto_id}/{uuid.uuid4().hex}.{TIPOS[archivo.content_type]}"
     sha = hashlib.sha256(datos).hexdigest()  # huella para comprobar integridad
 
-    # Los metadatos viajan junto al objeto en S3 (cabeceras x-amz-meta-*)
+    # Los metadatos viajan junto al objeto en S3 / Azure
     almacen.subir(clave, datos, archivo.content_type, {"sha256": sha})
     if p.get("imagen_key"):  # reemplazo: borrar la anterior
         almacen.eliminar(p["imagen_key"])
@@ -59,7 +71,7 @@ async def subir(producto_id: int = Form(gt=0), archivo: UploadFile = File(...)):
 # ---------------------------------------------------------------- Obtener URL
 @app.get("/imagenes/{producto_id}")
 def obtener(producto_id: int):
-    """Devuelve una URL prefirmada (1 hora) para descargar la imagen del producto."""
+    """Devuelve una URL prefirmada/SAS (1 hora) para descargar la imagen del producto."""
     clave = producto(producto_id).get("imagen_key")  # .get: puede no existir
     if not clave:
         raise HTTPException(404, "El producto no tiene imagen")
@@ -71,7 +83,7 @@ def obtener(producto_id: int):
 # ---------------------------------------------------------------- Borrar imagen
 @app.delete("/imagenes/{producto_id}", status_code=204)
 def eliminar(producto_id: int):
-    """Borra el objeto en S3 y quita la clave del producto (204 o 404)."""
+    """Borra el objeto en el almacenamiento y quita la clave del producto (204 o 404)."""
     clave = producto(producto_id).get("imagen_key")
     if not clave:
         raise HTTPException(404, "El producto no tiene imagen")
@@ -83,7 +95,8 @@ def eliminar(producto_id: int):
 @app.get("/health")
 def salud():
     """Lo consulta el gateway; sin este endpoint marca el servicio como caído."""
-    return {"servicio": "imagenes", "status": "ok", "bucket": almacen.bucket}
+    destino = getattr(almacen, "bucket", getattr(almacen, "container_name", "desconocido"))
+    return {"servicio": "imagenes", "status": "ok", "almacen": tipo_almacen, "destino": destino}
 
 
 # ---------------------------------------------------------------- Auxiliares
