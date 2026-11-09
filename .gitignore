@@ -233,3 +233,6 @@ __marimo__/
 seaweed/s3.json
 bench.env
 bench*.env
+bench.env
+bench-b2.env
+*.env
