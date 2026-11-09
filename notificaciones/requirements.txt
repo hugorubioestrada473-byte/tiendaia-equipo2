@@ -1,0 +1,5 @@
+# Dependencias del servicio Notificaciones (Lab. 3). Docker las instala al construir.
+fastapi>=0.115 # framework web: /health y /notificaciones (y el lifespan)
+uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la app FastAPI (CMD del Dockerfile)
+redis>=5.0 # lista "notificaciones" con los avisos más recientes
+pika>=1.3 # cliente de RabbitMQ (AMQP): consume los eventos venta.*
