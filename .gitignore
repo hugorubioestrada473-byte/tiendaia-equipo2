@@ -227,6 +227,12 @@ tempCodeRunnerFile.py
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-
 # Streamlit
 .streamlit/secrets.toml
+
+seaweed/s3.json
+bench.env
+bench*.env
+bench.env
+bench-b2.env
+*.env

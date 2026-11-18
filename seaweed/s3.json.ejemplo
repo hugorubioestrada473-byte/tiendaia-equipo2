@@ -1,0 +1,19 @@
+{
+"identities": [
+{
+"name": "admin",
+"credentials": [{"accessKey": "admin", "secretKey": "CAMBIAR-admin-secreto"}],
+"actions": ["Admin", "Read", "List", "Tagging", "Write"]
+},
+{
+"name": "svc-imagenes",
+"credentials": [
+{"accessKey": "svc-imagenes", "secretKey": "CAMBIAR-imagenes-secreto"}
+],
+"actions": ["Read:tiendaia-imagenes", "Write:tiendaia-imagenes",
+
+"List:tiendaia-imagenes"]
+
+}
+]
+}

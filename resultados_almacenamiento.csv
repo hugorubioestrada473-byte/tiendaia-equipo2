@@ -1,0 +1,57 @@
+fecha,destino,prueba,media,desv,unidad,n,errores
+2026-11-08T17:14:33,seaweedfs-laptop,subida 1 MB,23.89,11.85,MB/s,5,0
+2026-11-08T17:14:33,seaweedfs-laptop,bajada 1 MB,105.08,50.45,MB/s,5,0
+2026-11-08T17:14:34,seaweedfs-laptop,subida 10 MB,63.05,13.41,MB/s,5,0
+2026-11-08T17:14:34,seaweedfs-laptop,bajada 10 MB,263.96,78.86,MB/s,5,0
+2026-11-08T17:14:36,seaweedfs-laptop,subida 25 MB,75.35,8.06,MB/s,5,0
+2026-11-08T17:14:36,seaweedfs-laptop,bajada 25 MB,210.96,64.81,MB/s,5,0
+2026-11-08T17:14:38,seaweedfs-laptop,200 archivos de 10 KB,9.15,3.89,ms/archivo,200,0
+2026-11-08T17:14:38,seaweedfs-laptop,rendimiento pequenos,109.21,0,archivos/s,1,0
+2026-11-08T19:19:20,seaweedfs-laptop,subida 1 MB,10.96,1.31,MB/s,5,0
+2026-11-08T19:19:20,seaweedfs-laptop,bajada 1 MB,92.33,54.11,MB/s,5,0
+2026-11-08T19:19:21,seaweedfs-laptop,subida 10 MB,60.74,12.85,MB/s,5,0
+2026-11-08T19:19:21,seaweedfs-laptop,bajada 10 MB,258.4,63.6,MB/s,5,0
+2026-11-08T19:19:24,seaweedfs-laptop,subida 25 MB,77.82,7.04,MB/s,5,0
+2026-11-08T19:19:24,seaweedfs-laptop,bajada 25 MB,308.17,131.59,MB/s,5,0
+2026-11-08T19:19:25,seaweedfs-laptop,200 archivos de 10 KB,7.56,4.92,ms/archivo,200,0
+2026-11-08T19:19:25,seaweedfs-laptop,rendimiento pequenos,132.31,0,archivos/s,1,0
+2026-11-08T19:30:51,b2-laptop,subida 1 MB,0.69,0.05,MB/s,5,0
+2026-11-08T19:30:51,b2-laptop,bajada 1 MB,3.98,1.42,MB/s,5,0
+2026-11-08T19:31:58,b2-laptop,subida 10 MB,0.83,0.03,MB/s,5,0
+2026-11-08T19:31:58,b2-laptop,bajada 10 MB,7.9,0.64,MB/s,5,0
+2026-11-08T19:34:45,b2-laptop,subida 25 MB,0.83,0.04,MB/s,5,0
+2026-11-08T19:34:45,b2-laptop,bajada 25 MB,8.63,0.21,MB/s,5,0
+2026-11-08T19:54:36,b2-laptop,200 archivos de 10 KB,5953.25,74306.31,ms/archivo,200,0
+2026-11-08T19:54:36,b2-laptop,rendimiento pequenos,0.17,0,archivos/s,1,0
+2026-11-08T19:56:33,supabase-laptop,subida 1 MB,0.68,0.11,MB/s,5,0
+2026-11-08T19:56:33,supabase-laptop,bajada 1 MB,1.95,0.54,MB/s,5,0
+2026-11-08T19:57:41,supabase-laptop,subida 10 MB,0.85,0.04,MB/s,5,0
+2026-11-08T19:57:41,supabase-laptop,bajada 10 MB,6.99,1.49,MB/s,5,0
+2026-11-08T20:00:34,supabase-laptop,subida 25 MB,0.81,0.03,MB/s,5,0
+2026-11-08T20:00:34,supabase-laptop,bajada 25 MB,7.06,1.26,MB/s,5,0
+2026-11-08T20:01:31,supabase-laptop,200 archivos de 10 KB,282.62,227.54,ms/archivo,200,0
+2026-11-08T20:01:31,supabase-laptop,rendimiento pequenos,3.54,0,archivos/s,1,0
+2026-11-08T20:03:38,b2-laptop,subida 1 MB,0.68,0.06,MB/s,5,0
+2026-11-08T20:03:38,b2-laptop,bajada 1 MB,3.77,1.37,MB/s,5,0
+2026-11-08T20:04:46,b2-laptop,subida 10 MB,0.82,0.03,MB/s,5,0
+2026-11-08T20:04:46,b2-laptop,bajada 10 MB,8.22,0.59,MB/s,5,0
+2026-11-08T20:07:32,b2-laptop,subida 25 MB,0.83,0.03,MB/s,5,0
+2026-11-08T20:07:32,b2-laptop,bajada 25 MB,8.82,0.32,MB/s,5,0
+2026-11-08T20:09:36,b2-laptop,200 archivos de 10 KB,620.17,338.34,ms/archivo,200,0
+2026-11-08T20:09:36,b2-laptop,rendimiento pequenos,1.61,0,archivos/s,1,0
+2026-11-08T20:23:59,supabase-laptop,subida 1 MB,0.68,0.1,MB/s,5,0
+2026-11-08T20:23:59,supabase-laptop,bajada 1 MB,2.49,0.91,MB/s,5,0
+2026-11-08T20:25:06,supabase-laptop,subida 10 MB,0.86,0.03,MB/s,5,0
+2026-11-08T20:25:06,supabase-laptop,bajada 10 MB,6.88,1.32,MB/s,5,0
+2026-11-08T20:27:49,supabase-laptop,subida 25 MB,0.88,0.02,MB/s,5,0
+2026-11-08T20:27:49,supabase-laptop,bajada 25 MB,6.99,1.17,MB/s,5,0
+2026-11-08T20:28:43,supabase-laptop,200 archivos de 10 KB,270.22,188.98,ms/archivo,200,0
+2026-11-08T20:28:43,supabase-laptop,rendimiento pequenos,3.7,0,archivos/s,1,0
+2026-11-08T20:30:04,b2-laptop,subida 1 MB,0.68,0.06,MB/s,5,0
+2026-11-08T20:30:04,b2-laptop,bajada 1 MB,3.7,1.65,MB/s,5,0
+2026-11-08T20:31:18,b2-laptop,subida 10 MB,0.76,0.06,MB/s,5,0
+2026-11-08T20:31:18,b2-laptop,bajada 10 MB,7.78,0.55,MB/s,5,0
+2026-11-08T20:34:08,b2-laptop,subida 25 MB,0.81,0.04,MB/s,5,0
+2026-11-08T20:34:08,b2-laptop,bajada 25 MB,8.2,0.79,MB/s,5,0
+2026-11-08T20:36:03,b2-laptop,200 archivos de 10 KB,574.57,417.47,ms/archivo,200,0
+2026-11-08T20:36:03,b2-laptop,rendimiento pequenos,1.74,0,archivos/s,1,0
