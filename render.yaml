@@ -1,38 +1,29 @@
 # Blueprint de Render para TiendaIA (Laboratorio 5): infraestructura como código.
-# Describe los DOS servicios de la Parte B. Render lee este archivo de la raíz
-# del repositorio y crea o actualiza los servicios para que coincidan con él.
-# Cambie "equipoN" por el número de su equipo (el nombre es parte de la URL).
-# La sintaxis puede cambiar: verifíquela en la documentación oficial de Render
-# (busque "Blueprint YAML Reference") antes de aplicarlo.
 services:
   # ---------------------------------------------------------- IA-Service (Web Service)
-  - type: web # servicio que escucha peticiones HTTP
+  - type: web
     name: tiendaia-ia-equipo2
-    runtime: python # Python nativo de Render (no usa el Dockerfile)
-    plan: free # plan gratuito: se duerme sin tráfico
-    rootDir: ia_service # carpeta con app.py y requirements.txt
+    runtime: python
+    plan: free
+    rootDir: ia_service
     buildCommand: pip install -r requirements.txt
-    # Render indica el puerto en la variable PORT; 0.0.0.0 acepta conexiones externas
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health # Render no envía tráfico hasta que responda 200
+    healthCheckPath: /health
     envVars:
-      # sync: false = el valor NO se escribe aquí (cambia con cada codespace y es
-      # configuración del equipo): Render lo pide en pantalla al aplicar.
       - key: VENTAS_URL
         sync: false
-      - key: MODELO_PATH # /tmp sí se puede escribir en Render
+      - key: MODELO_PATH
         value: /tmp/modelo.joblib
-      - key: PYTHON_VERSION # versión fija: el mismo resultado en cada despliegue
+      - key: PYTHON_VERSION
         value: 3.12.7
 
   # ---------------------------------------------------------- Cliente web (Static Site)
   - type: web
     name: tiendaia-web-equipo2
-    runtime: static # archivos estáticos servidos desde un CDN
+    runtime: static
     rootDir: frontend
-    buildCommand: echo "sin construccion" # no hay nada que compilar
-    staticPublishPath: . # relativo a rootDir: publica frontend/ completo
-    # Cabeceras de seguridad que el CDN agrega a todas las respuestas
+    buildCommand: echo "sin construccion"
+    staticPublishPath: .
     headers:
       - path: /*
         name: X-Frame-Options
