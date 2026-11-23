@@ -236,3 +236,4 @@ bench*.env
 bench.env
 bench-b2.env
 *.env
+*.joblib
