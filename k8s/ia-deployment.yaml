@@ -1,0 +1,58 @@
+# Deployment del IA-Service de inferencia (Laboratorio 5).
+# Un Deployment declara CUÁNTAS copias (réplicas) de un pod deben existir y con
+# qué imagen. Kubernetes compara siempre lo declarado con lo que hay y corrige
+# la diferencia: si un pod muere, crea otro (autorreparación).
+# Se aplica con: kubectl apply -f k8s/ia-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ia # nombre del Deployment (kubectl get deploy ia)
+  labels: {app: ia}
+spec:
+  replicas: 2 # estado deseado inicial; el HPA lo cambiará
+  # El Deployment administra los pods que tengan la etiqueta app=ia
+  selector:
+    matchLabels: {app: ia}
+  # Plantilla de cada pod que se cree
+  template:
+    metadata:
+      labels: {app: ia} # debe coincidir con el selector de arriba
+    spec:
+      containers:
+        - name: ia
+          # Imagen construida con el Dockerfile del repositorio y cargada al
+          # clúster con "kind load docker-image" (no está en ningún registro).
+          image: tiendaia-ia:1
+          # IfNotPresent: usar la imagen que ya está en el nodo; con "Always"
+          # intentaría descargarla de Docker Hub y fallaría (ErrImagePull).
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000 # uvicorn escucha aquí (CMD del Dockerfile)
+          env:
+            # El modelo viaja DENTRO de la imagen (/app/modelo.joblib): este pod
+            # solo sirve predicciones; no entrena ni necesita el servicio Ventas.
+            - name: MODELO_PATH
+              value: /app/modelo.joblib
+          # Recursos: "requests" es lo que se RESERVA en el nodo para el pod (el
+          # planificador lo usa para decidir dónde cabe); "limits" es el máximo.
+          # 100m = 0.1 núcleo. El HPA calcula el % de CPU sobre el request.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m # si pide más CPU, se le frena (throttling)
+              memory: 512Mi # si usa más memoria, se reinicia (OOMKilled)
+          # readinessProbe: ¿ya puede recibir tráfico? Mientras falle, el
+          # Service NO le envía peticiones (p. ej. mientras carga librerías).
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          # livenessProbe: ¿sigue vivo? Si falla 3 veces seguidas, Kubernetes
+          # reinicia el contenedor (por ejemplo, si el proceso se congela).
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
