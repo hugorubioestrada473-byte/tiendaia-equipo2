@@ -35,3 +35,4 @@ services:
         value: nosniff
 
 # Prueba de sincronizacion automatica del Blueprint - lab5
+# Prueba deriva de configuracion Lab 5
