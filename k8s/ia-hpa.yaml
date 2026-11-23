@@ -19,7 +19,7 @@ spec:
       resource:
         name: cpu
         target:
-        type: Utilization
-        # 50 % del request de CPU (100m) = 50m por pod en promedio. Si los
-        # pods usan más, se agregan réplicas; si usan menos, se quitan.
-        averageUtilization: 50
+          type: Utilization
+          # 50 % del request de CPU (100m) = 50m por pod en promedio. Si los
+          # pods usan más, se agregan réplicas; si usan menos, se quitan.
+          averageUtilization: 50
