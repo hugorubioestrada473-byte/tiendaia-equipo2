@@ -1,7 +1,7 @@
 # --- TiendaIA: nunca subir ---
 # llaves y contraseñas reales
 .env
-
+.env.claves
 # entorno virtual (cada quien crea el suyo)
 .venv/
 # archivos compilados de Python
