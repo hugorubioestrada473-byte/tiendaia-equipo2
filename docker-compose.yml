@@ -1,11 +1,32 @@
-# TiendaIA - Laboratorio 4
-# TiendaIA - Laboratorio 3 (Completo corregido)
+# TiendaIA - Laboratorio 5 (Parte E: segmentación de redes y proxy perimetral)
 x-servicio: &servicio
   restart: unless-stopped
   build: &construir
     context: .
 
 services:
+# ------------------------------ Perímetro
+# Nginx: sirve el cliente web y es la única puerta hacia la API.
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      # Configuración del proxy perimetral; reemplaza la de fábrica de Nginx
+      - ./perimetro/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports: ["8081:80"]          # ÚNICO puerto abierto a la red
+    networks: [publica]         # NO está en "interna": no ve bases de datos
+    depends_on: [gateway]
+
+  gateway:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: gateway}}
+    # Se borró ports: ["8080:8000"]: ya solo se llega por Nginx.
+    environment:
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on: [clientes, productos, ventas, ia, rabbitmq, imagenes]
+    networks: [publica, interna]   # puente entre el perímetro y los servicios
+
 # ------------------------------ Bases de datos
   mysql:
     image: mysql:8.4
@@ -20,6 +41,7 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       retries: 20
+    networks: [interna]
 
   mongo:
     image: mongo:7
@@ -29,22 +51,27 @@ services:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       retries: 20
+    networks: [interna]
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes: [redis_data:/data]
+    networks: [interna]
 
 # ------------------------------ Broker de mensajes
   rabbitmq:
     image: rabbitmq:4-management
     restart: unless-stopped
+    # El panel 15672 queda solo en 127.0.0.1 (esta máquina). Docker no publica
+    # puertos de una red "internal", por eso se agrega la red "gestion".
     ports: ["127.0.0.1:15672:15672"]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       retries: 10
+    networks: [interna, gestion]
 
 # ------------------------------ Microservicios
   clientes:
@@ -53,6 +80,7 @@ services:
     environment:
       DATABASE_URL: mysql+pymysql://tienda:${MYSQL_PASSWORD}@mysql:3306/tienda
     depends_on: {mysql: {condition: service_healthy}}
+    networks: [interna]
 
   productos:
     <<: *servicio
@@ -60,6 +88,7 @@ services:
     environment:
       MONGO_URL: mongodb://mongo:27017
     depends_on: {mongo: {condition: service_healthy}}
+    networks: [interna]
 
   ventas:
     <<: *servicio
@@ -68,6 +97,7 @@ services:
       REDIS_HOST: redis
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
     depends_on: [redis, clientes, productos, rabbitmq]
+    networks: [interna]
 
   ia:
     <<: *servicio
@@ -79,14 +109,16 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
     volumes: [modelos:/modelos]
     depends_on: [ventas, rabbitmq]
+    networks: [interna]
 
   notificaciones:
     <<: *servicio
     build: {<<: *construir, args: {SERVICIO: notificaciones}}
-    environment: 
+    environment:
       REDIS_HOST: redis
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
     depends_on: {rabbitmq: {condition: service_healthy}}
+    networks: [interna]
 
   seaweedfs:
     image: chrislusf/seaweedfs
@@ -97,13 +129,16 @@ services:
     command: >-
       server -dir=/data -volume.max=100 -master.volumeSizeLimitMB=1024
       -s3 -s3.config=/etc/seaweedfs/s3.json
-    # 8333 = puerto de la API S3. Se publica porque el navegador descarga las
-    # imágenes directamente de aquí con las URL prefirmadas.
-    ports: ["8333:8333"]
+    # Antes: ports: ["8333:8333"] (abierto a toda la red). Ahora solo desde esta
+    # máquina, para los scripts de administración (crear_buckets.py).
+    ports: ["127.0.0.1:8333:8333"]
     volumes:
       - seaweed_data:/data
       - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro # :ro = solo lectura
-    # Microservicio Imágenes: sube y borra objetos y firma URL de descarga.
+    # "publica": Nginx le reenvía las descargas de imágenes (/tiendaia-imagenes/)
+    networks: [interna, publica]
+
+  # Microservicio Imágenes: sube y borra objetos y firma URL de descarga.
   imagenes:
     <<: *servicio # restart común a todos
     build: {<<: *construir, args: {SERVICIO: imagenes}}
@@ -113,13 +148,14 @@ services:
       - AZURE_PUBLIC_ENDPOINT=http://localhost:10000/devstoreaccount1
       - AZURE_CONTAINER_NAME=bench-contenedor
       - S3_ENDPOINT=http://seaweedfs:8333
-      - S3_PUBLIC_ENDPOINT=http://localhost:8333
+      # Las URL prefirmadas ahora apuntan a Nginx, que reenvía a SeaweedFS
+      - S3_PUBLIC_ENDPOINT=http://localhost:8081
       - S3_BUCKET=tiendaia-imagenes
       - S3_ACCESS_KEY=${S3_ADMIN_KEY}
       - S3_SECRET_KEY=${S3_ADMIN_SECRET}
     # Orden de arranque: Azurite, S3 y Productos
     depends_on: [azurite, seaweedfs, productos]
-    # Y en volumes: seaweed_data:
+    networks: [interna]
 
   worker:
     <<: *servicio
@@ -132,39 +168,28 @@ services:
       RETARDO_MS: "200"
     volumes: [modelos:/modelos]
     depends_on: {rabbitmq: {condition: service_healthy}}
+    networks: [interna]
 
   ia_listener:
     <<: *servicio
     build: {<<: *construir, args: {SERVICIO: ia_listener}}
     command: ["python", "listener.py"]
-    environment: 
-      REDIS_HOST: redis 
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq} 
+    environment:
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       IA_URL: "http://ia:8000"
     depends_on: {rabbitmq: {condition: service_healthy}}
-    
+    networks: [interna]
+
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     restart: unless-stopped
     command: azurite-blob --blobHost 0.0.0.0
+    # Antes: "10000:10000" (abierto a toda la red). Ahora solo desde esta máquina;
+    # "gestion" permite publicar el puerto (la red "interna" no puede).
     ports:
-      - "10000:10000"
-
-# ------------------------------ Punto de entrada
-  gateway:
-    <<: *servicio
-    build: {<<: *construir, args: {SERVICIO: gateway}}
-    ports: ["8080:8000"]
-    environment:
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
-    depends_on: [clientes, productos, ventas, ia, rabbitmq, imagenes]
-
-# ------------------------------ Cliente web
-  web:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    volumes: ["./frontend:/usr/share/nginx/html:ro"]
-    ports: ["8081:80"]
+      - "127.0.0.1:10000:10000"
+    networks: [interna, gestion]
 
 # ------------------------------ Volúmenes
 volumes:
@@ -173,3 +198,10 @@ volumes:
   redis_data:
   modelos:
   seaweed_data:
+
+# ------------------------------ Redes
+networks:
+  publica: {}            # red normal (bridge): permite publicar puertos
+  interna:
+    internal: true       # sin salida a Internet ni puertos publicados
+  gestion: {}            # solo para publicar paneles locales en 127.0.0.1
