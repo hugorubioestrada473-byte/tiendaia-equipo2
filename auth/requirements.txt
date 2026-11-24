@@ -1,0 +1,5 @@
+# Auth-Service (Laboratorio 6). Docker lo instala al construir la imagen.
+# hashlib, hmac, secrets y sqlite3 vienen con Python: no se instalan.
+fastapi>=0.115 # framework web: endpoints, validación con Pydantic y /docs
+uvicorn[standard]>=0.30 # servidor ASGI que ejecuta la aplicación FastAPI
+pyjwt>=2.8 # crea y verifica los tokens JWT (se importa como "jwt")
