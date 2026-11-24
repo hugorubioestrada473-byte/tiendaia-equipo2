@@ -1,0 +1,25 @@
+# Escalado automático horizontal del IA-Service (Laboratorio 5).
+# El HorizontalPodAutoscaler (HPA) revisa cada 15 s el uso de CPU de los pods
+# (lo mide metrics-server) y ajusta "replicas" del Deployment para acercarse
+# al objetivo: réplicas deseadas = réplicas actuales x (uso actual / objetivo).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ia
+spec:
+  # Qué se escala: el Deployment "ia"
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ia
+  minReplicas: 1 # sin carga deja una sola réplica (ahorra recursos)
+  maxReplicas: 5 # tope: protege al clúster (y al presupuesto)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # 50 % del request de CPU (100m) = 50m por pod en promedio. Si los
+          # pods usan más, se agregan réplicas; si usan menos, se quitan.
+          averageUtilization: 50

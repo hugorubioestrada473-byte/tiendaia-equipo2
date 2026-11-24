@@ -5,6 +5,7 @@ services:
     name: tiendaia-ia-equipo2
     runtime: python
     plan: free
+    branch: lab5
     rootDir: ia_service
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
@@ -22,6 +23,7 @@ services:
     name: tiendaia-web-equipo2
     runtime: static
     rootDir: frontend
+    branch: lab5
     buildCommand: echo "sin construccion"
     staticPublishPath: .
     headers:
@@ -31,3 +33,6 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
+
+# Prueba de sincronizacion automatica del Blueprint - lab5
+# Prueba deriva de configuracion Lab 5

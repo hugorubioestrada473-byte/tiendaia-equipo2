@@ -1,0 +1,17 @@
+# Service del IA-Service (Laboratorio 5).
+# Los pods nacen y mueren y cada uno tiene una IP distinta. Un Service da un
+# nombre y una IP FIJOS ("ia", puerto 8000) y reparte las peticiones entre los
+# pods listos que tengan la etiqueta app=ia. Es el equivalente al nombre de
+# servicio de Docker Compose (http://ia:8000), pero con balanceo de carga.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ia # nombre DNS dentro del clúster: http://ia:8000
+spec:
+  # ClusterIP: solo accesible DENTRO del clúster (no se publica hacia fuera).
+  # Para probar desde la terminal se usa "kubectl port-forward".
+  type: ClusterIP
+  selector: {app: ia} # envía tráfico a los pods con esta etiqueta
+  ports:
+    - port: 8000 # puerto del Service
+      targetPort: 8000 # puerto del contenedor
