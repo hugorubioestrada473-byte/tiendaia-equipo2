@@ -1,11 +1,43 @@
-# TiendaIA - Laboratorio 4
-# TiendaIA - Laboratorio 3 (Completo corregido)
+# TiendaIA - Laboratorio 6 (Autenticación, Autorización y Perímetro)
 x-servicio: &servicio
   restart: unless-stopped
   build: &construir
     context: .
 
 services:
+# ------------------------------ Perímetro
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./perimetro/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports: ["8081:80"]
+    networks: [publica]
+    depends_on: [gateway]
+
+  gateway:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: gateway}}
+    environment:
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      JWT_SECRET: ${JWT_SECRET:-}
+      API_KEY: ${API_KEY_GATEWAY:-}
+    depends_on: [clientes, productos, ventas, ia, rabbitmq, imagenes, auth]
+    networks: [publica, interna]
+
+# ------------------------------ Autenticación (Lab. 6)
+  auth:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: auth}}
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      AUTH_DB: /data/auth.db
+    volumes: [auth_data:/data]
+    networks: [interna, publica]
+    ports: ["127.0.0.1:8001:8000"]
+
 # ------------------------------ Bases de datos
   mysql:
     image: mysql:8.4
@@ -20,6 +52,7 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       retries: 20
+    networks: [interna]
 
   mongo:
     image: mongo:7
@@ -29,12 +62,14 @@ services:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       retries: 20
+    networks: [interna]
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes: [redis_data:/data]
+    networks: [interna]
 
 # ------------------------------ Broker de mensajes
   rabbitmq:
@@ -45,21 +80,8 @@ services:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       retries: 10
+    networks: [interna, gestion]
 
-  auth:
-    <<: *servicio
-    build: {<<: *construir, args: {SERVICIO: auth}}
-    environment:
-      JWT_SECRET: ${JWT_SECRET:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      AUTH_DB: /data/auth.db
-    volumes: [auth_data:/data]
-    # Red interna del Lab. 5 (ahí lo encuentran el gateway y los servicios).
-    # TEMPORAL, solo para usar Swagger de Auth en el Paso 5: también en "publica"
-    # y con un puerto solo en 127.0.0.1. Al terminar deje networks: [interna]
-    # y borre "ports" (Parte F).
-    networks: [default, interna, publica]
-    ports: ["127.0.0.1:8001:8000"]
 # ------------------------------ Microservicios
   clientes:
     <<: *servicio
@@ -67,6 +89,7 @@ services:
     environment:
       DATABASE_URL: mysql+pymysql://tienda:${MYSQL_PASSWORD}@mysql:3306/tienda
     depends_on: {mysql: {condition: service_healthy}}
+    networks: [interna]
 
   productos:
     <<: *servicio
@@ -74,6 +97,7 @@ services:
     environment:
       MONGO_URL: mongodb://mongo:27017
     depends_on: {mongo: {condition: service_healthy}}
+    networks: [interna]
 
   ventas:
     <<: *servicio
@@ -82,6 +106,7 @@ services:
       REDIS_HOST: redis
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
     depends_on: [redis, clientes, productos, rabbitmq]
+    networks: [interna]
 
   ia:
     <<: *servicio
@@ -93,33 +118,31 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
     volumes: [modelos:/modelos]
     depends_on: [ventas, rabbitmq]
+    networks: [interna]
 
   notificaciones:
     <<: *servicio
     build: {<<: *construir, args: {SERVICIO: notificaciones}}
-    environment: 
+    environment:
       REDIS_HOST: redis
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
     depends_on: {rabbitmq: {condition: service_healthy}}
+    networks: [interna]
 
   seaweedfs:
     image: chrislusf/seaweedfs
     restart: unless-stopped
-    # -volume.max: máximo de volúmenes; -master.volumeSizeLimitMB: tamaño de
-    # cada volumen; -s3.config: archivo con identidades (llaves) y permisos.
-    # ">-" une las líneas siguientes en una sola (mismo comando, solo más legible).
     command: >-
       server -dir=/data -volume.max=100 -master.volumeSizeLimitMB=1024
       -s3 -s3.config=/etc/seaweedfs/s3.json
-    # 8333 = puerto de la API S3. Se publica porque el navegador descarga las
-    # imágenes directamente de aquí con las URL prefirmadas.
-    ports: ["8333:8333"]
+    ports: ["127.0.0.1:8333:8333"]
     volumes:
       - seaweed_data:/data
-      - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro # :ro = solo lectura
-    # Microservicio Imágenes: sube y borra objetos y firma URL de descarga.
+      - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro
+    networks: [interna, publica]
+
   imagenes:
-    <<: *servicio # restart común a todos
+    <<: *servicio
     build: {<<: *construir, args: {SERVICIO: imagenes}}
     environment:
       - ALMACEN=azure
@@ -127,13 +150,12 @@ services:
       - AZURE_PUBLIC_ENDPOINT=http://localhost:10000/devstoreaccount1
       - AZURE_CONTAINER_NAME=bench-contenedor
       - S3_ENDPOINT=http://seaweedfs:8333
-      - S3_PUBLIC_ENDPOINT=http://localhost:8333
+      - S3_PUBLIC_ENDPOINT=http://localhost:8081
       - S3_BUCKET=tiendaia-imagenes
       - S3_ACCESS_KEY=${S3_ADMIN_KEY}
       - S3_SECRET_KEY=${S3_ADMIN_SECRET}
-    # Orden de arranque: Azurite, S3 y Productos
     depends_on: [azurite, seaweedfs, productos]
-    # Y en volumes: seaweed_data:
+    networks: [interna]
 
   worker:
     <<: *servicio
@@ -146,41 +168,26 @@ services:
       RETARDO_MS: "200"
     volumes: [modelos:/modelos]
     depends_on: {rabbitmq: {condition: service_healthy}}
+    networks: [interna]
 
   ia_listener:
     <<: *servicio
     build: {<<: *construir, args: {SERVICIO: ia_listener}}
     command: ["python", "listener.py"]
-    environment: 
-      REDIS_HOST: redis 
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq} 
+    environment:
+      REDIS_HOST: redis
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       IA_URL: "http://ia:8000"
     depends_on: {rabbitmq: {condition: service_healthy}}
-    
+    networks: [interna]
+
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     restart: unless-stopped
     command: azurite-blob --blobHost 0.0.0.0
     ports:
       - "10000:10000"
-
-# ------------------------------ Punto de entrada
-  gateway:
-    <<: *servicio
-    build: {<<: *construir, args: {SERVICIO: gateway}}
-    ports: ["8080:8000"]
-    environment:
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
-      JWT_SECRET: ${JWT_SECRET:-}
-      API_KEY: ${API_KEY_GATEWAY:-}
-    depends_on: [clientes, productos, ventas, ia, rabbitmq, imagenes]
-
-# ------------------------------ Cliente web
-  web:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    volumes: ["./frontend:/usr/share/nginx/html:ro"]
-    ports: ["8081:80"]
+    networks: [interna, gestion]
 
 # ------------------------------ Volúmenes
 volumes:
@@ -191,6 +198,9 @@ volumes:
   seaweed_data:
   auth_data:
 
+# ------------------------------ Redes
 networks:
+  publica: {}
   interna:
-  publica:
+    internal: true
+  gestion: {}
