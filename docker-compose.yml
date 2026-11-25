@@ -46,6 +46,20 @@ services:
       interval: 10s
       retries: 10
 
+  auth:
+    <<: *servicio
+    build: {<<: *construir, args: {SERVICIO: auth}}
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      AUTH_DB: /data/auth.db
+    volumes: [auth_data:/data]
+    # Red interna del Lab. 5 (ahí lo encuentran el gateway y los servicios).
+    # TEMPORAL, solo para usar Swagger de Auth en el Paso 5: también en "publica"
+    # y con un puerto solo en 127.0.0.1. Al terminar deje networks: [interna]
+    # y borre "ports" (Parte F).
+    networks: [default, interna, publica]
+    ports: ["127.0.0.1:8001:8000"]
 # ------------------------------ Microservicios
   clientes:
     <<: *servicio
@@ -157,6 +171,8 @@ services:
     ports: ["8080:8000"]
     environment:
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      JWT_SECRET: ${JWT_SECRET:-}
+      API_KEY: ${API_KEY_GATEWAY:-}
     depends_on: [clientes, productos, ventas, ia, rabbitmq, imagenes]
 
 # ------------------------------ Cliente web
@@ -173,3 +189,8 @@ volumes:
   redis_data:
   modelos:
   seaweed_data:
+  auth_data:
+
+networks:
+  interna:
+  publica:
